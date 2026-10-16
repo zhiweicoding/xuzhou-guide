@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1"/>
+<meta name="theme-color" content="#1a5c3a"/>
+<title>徐州三日游 · 天津出发</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root {
+    --bg: #f4f6f4; --card: #ffffff; --text: #1a1a1a; --muted: #667066;
+    --accent: #1a5c3a; --accent2: #2d8a5a; --d1: #2563eb; --d2: #c2410c;
+    --d3: #7c3aed; --opt: #64748b; --food: #e11d48; --border: #e2e8e4;
+    --shadow: 0 2px 12px rgba(0,0,0,.08); --safe-b: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.45;
+  }
+  .app { display: flex; flex-direction: column; height: 100%; height: 100dvh; }
+  header { flex: 0 0 auto; background: var(--accent); color: #fff; padding: .75rem 1rem .65rem; z-index: 20; }
+  header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: .02em; }
+  header .sub { font-size: .78rem; opacity: .88; margin-top: .15rem; }
+  header a { color: #b8f0d0; text-decoration: underline; text-underline-offset: 2px; }
+  .tabs { display: flex; gap: .4rem; margin-top: .65rem; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex: 0 0 auto; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.12);
+    color: #fff; border-radius: 999px; padding: .32rem .75rem; font-size: .78rem; font-weight: 600;
+    cursor: pointer; white-space: nowrap;
+  }
+  .tab.active { background: #fff; color: var(--accent); border-color: #fff; }
+  .main { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; position: relative; }
+  #map { flex: 1 1 auto; min-height: 36vh; width: 100%; z-index: 1; }
+  .map-chip {
+    position: absolute; top: 10px; left: 10px; right: 10px; z-index: 5; pointer-events: none;
+    display: flex; flex-wrap: wrap; gap: .35rem;
+  }
+  .map-chip span {
+    background: rgba(255,255,255,.92); backdrop-filter: blur(6px); border: 1px solid var(--border);
+    border-radius: 8px; padding: .28rem .55rem; font-size: .68rem; font-weight: 600; color: #334;
+    box-shadow: var(--shadow);
+  }
+  .panel {
+    flex: 0 0 auto; max-height: 54vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: var(--card); border-radius: 16px 16px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,.1);
+    z-index: 10; padding: 0 0 calc(.9rem + var(--safe-b));
+  }
+  .handle { width: 36px; height: 4px; border-radius: 2px; background: #d0d5d0; margin: .55rem auto .35rem; }
+  .panel-inner { padding: 0 1rem .2rem; }
+  .day-block { display: none; margin-bottom: 1rem; }
+  .day-block.show { display: block; }
+  .day-block h2 { font-size: .95rem; margin: .4rem 0 .5rem; display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
+  .badge { display: inline-block; font-size: .68rem; font-weight: 700; padding: .12rem .45rem; border-radius: 6px; color: #fff; }
+  .badge.d1 { background: var(--d1); } .badge.d2 { background: var(--d2); }
+  .badge.d3 { background: var(--d3); } .badge.all { background: var(--accent); }
+  .badge.wx { background: #0369a1; } .badge.tx { background: #b45309; }
+  .badge.food { background: var(--food); } .badge.opt { background: var(--opt); }
+  .steps { list-style: none; }
+  .steps li {
+    position: relative; padding: .45rem 0 .45rem 1.6rem; border-left: 2px solid var(--border);
+    margin-left: .45rem; font-size: .86rem;
+  }
+  .steps li:last-child { border-left-color: transparent; }
+  .steps li::before {
+    content: ""; position: absolute; left: -.42rem; top: .7rem; width: .65rem; height: .65rem;
+    border-radius: 50%; background: var(--accent2); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--accent2);
+  }
+  .steps li.d1::before { background: var(--d1); box-shadow: 0 0 0 1px var(--d1); }
+  .steps li.d2::before { background: var(--d2); box-shadow: 0 0 0 1px var(--d2); }
+  .steps li.d3::before { background: var(--d3); box-shadow: 0 0 0 1px var(--d3); }
+  .steps li.opt::before { background: var(--opt); box-shadow: 0 0 0 1px var(--opt); }
+  .steps li.food::before { background: var(--food); box-shadow: 0 0 0 1px var(--food); }
+  .steps .name { font-weight: 650; }
+  .steps .feat { color: var(--accent); font-size: .78rem; margin-top: .12rem; font-weight: 600; }
+  .steps .tip { color: var(--muted); font-size: .76rem; margin-top: .08rem; }
+  .info-grid { display: grid; gap: .55rem; margin: .35rem 0 .7rem; }
+  .ibox { border-radius: 10px; padding: .65rem .8rem; font-size: .78rem; line-height: 1.5; }
+  .ibox.weather { background: #e0f2fe; border: 1px solid #bae6fd; color: #0c4a6e; }
+  .ibox.transit { background: #fff7ed; border: 1px solid #fed7aa; color: #7c2d12; }
+  .ibox.logic { background: #f0f7f2; border: 1px solid #d4e8db; color: #2a4a35; }
+  .ibox.foodbox { background: #fff1f2; border: 1px solid #fecdd3; color: #881337; }
+  .ibox.nearby { background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; }
+  .ibox h3 { font-size: .8rem; margin-bottom: .3rem; display: flex; align-items: center; gap: .35rem; }
+  .ibox ul { margin: .2rem 0 0 1.05rem; padding: 0; }
+  .ibox li { margin: .15rem 0; }
+  .ibox a { color: inherit; font-weight: 700; }
+  .food-grid { display: grid; gap: .4rem; margin-top: .35rem; }
+  .food-item {
+    background: #fff; border: 1px solid #fecdd3; border-radius: 8px; padding: .45rem .6rem;
+    font-size: .76rem; color: #4c0519;
+  }
+  .food-item b { color: #be123c; }
+  .tips-box {
+    background: #f0f7f2; border: 1px solid #d4e8db; border-radius: 10px; padding: .65rem .8rem;
+    font-size: .78rem; color: #2a4a35; margin-top: .4rem;
+  }
+  .tips-box strong { color: var(--accent); }
+  footer.note { font-size: .72rem; color: var(--muted); padding: .5rem 0 0; line-height: 1.5; }
+  .legend { display: flex; flex-wrap: wrap; gap: .5rem .85rem; font-size: .72rem; color: var(--muted); margin: .35rem 0 .6rem; }
+  .legend span::before {
+    content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+    margin-right: .3rem; vertical-align: -1px;
+  }
+  .legend .l1::before { background: var(--d1); } .legend .l2::before { background: var(--d2); }
+  .legend .l3::before { background: var(--d3); } .legend .lo::before { background: var(--opt); border: 1.5px dashed #94a3b8; background: #fff; }
+  .legend .lf::before { background: var(--food); }
+  .leaflet-popup-content { margin: .65rem .8rem; font-size: .82rem; min-width: 170px; max-width: 260px; }
+  .popup h3 { font-size: .92rem; margin-bottom: .25rem; }
+  .popup .feat { color: var(--accent); font-weight: 650; font-size: .78rem; margin: .2rem 0; }
+  .popup .meta { color: var(--muted); font-size: .75rem; margin: .15rem 0; }
+  .popup .pc { margin-top: .3rem; font-size: .75rem; }
+  .popup .tag {
+    display: inline-block; font-size: .65rem; font-weight: 600; padding: .08rem .35rem;
+    border-radius: 4px; margin-right: .25rem; background: #eef2ff; color: #3730a3;
+  }
+  .popup .tag.out { background: #ecfdf5; color: #065f46; }
+  .popup .tag.in { background: #fff7ed; color: #9a3412; }
+  .popup .tag.opt { background: #f1f5f9; color: #475569; }
+  .popup .tag.food { background: #ffe4e6; color: #9f1239; }
+  .marker-label { background: transparent; border: none; }
+  .num-pin {
+    width: 28px; height: 28px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700;
+    font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,.25); border: 2px solid #fff;
+  }
+  .num-pin span { transform: rotate(45deg); line-height: 1; }
+  .num-pin.d1 { background: var(--d1); } .num-pin.d2 { background: var(--d2); }
+  .num-pin.d3 { background: var(--d3); }
+  .num-pin.opt {
+    background: #fff; color: #64748b; border: 2px dashed #94a3b8; box-shadow: none;
+  }
+  .num-pin.opt span { color: #64748b; font-size: 11px; }
+  .num-pin.food {
+    background: var(--food); border-radius: 50%; transform: none; width: 30px; height: 30px;
+    border: 2px solid #fff;
+  }
+  .num-pin.food span { transform: none; font-size: 14px; }
+  @media (min-width: 860px) {
+    .main { flex-direction: row; }
+    #map { flex: 1 1 58%; min-height: 0; }
+    .panel { flex: 0 0 420px; max-height: none; height: 100%; border-radius: 0; box-shadow: -4px 0 20px rgba(0,0,0,.06); }
+    .handle { display: none; }
+    .map-chip { right: auto; max-width: 340px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>徐州三日游</h1>
+    <p class="sub">天津出发 · 10/16–10/18 · 雨天优化 · 车次以 <a href="https://kyfw.12306.cn/otn/leftTicket/init" target="_blank" rel="noopener">12306</a> 为准</p>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-day="all" type="button">全部</button>
+      <button class="tab" data-day="1" type="button">Day1 周五</button>
+      <button class="tab" data-day="2" type="button">Day2 周六</button>
+      <button class="tab" data-day="3" type="button">Day3 周日</button>
+    </div>
+  </header>
+  <div class="main">
+    <div id="map" aria-label="徐州行程地图"></div>
+    <div class="map-chip" id="mapChips" aria-hidden="true">
+      <span>🌧 周五小雨 18–27℃</span>
+      <span>🌂 周六中雨偏室内</span>
+      <span>🧥 周日傍晚约 12℃</span>
+    </div>
+    <aside class="panel">
+      <div class="handle"></div>
+      <div class="panel-inner">
+        <div class="legend">
+          <span class="l1">周五</span><span class="l2">周六</span><span class="l3">周日</span>
+          <span class="lo">可选景点</span><span class="lf">美食</span>
+        </div>
+
+        <section class="day-block show" data-panel="all">
+          <h2><span class="badge all">总览</span> 三天主线</h2>
+          <div class="info-grid">
+            <div class="ibox weather">
+              <h3><span class="badge wx">天气</span> 10/16–10/18 徐州</h3>
+              <ul>
+                <li><strong>周五</strong>：小雨，18–27℃</li>
+                <li><strong>周六</strong>：中雨转小雨，18–24℃ → <strong>偏室内</strong></li>
+                <li><strong>周日</strong>：多云转阴，12–24℃，傍晚约 12℃</li>
+                <li>必带：折叠伞 + 薄外套</li>
+              </ul>
+            </div>
+            <div class="ibox transit">
+              <h3><span class="badge tx">交通</span> 城际 + 市内</h3>
+              <ul>
+                <li><strong>城际</strong>：天津南/天津西 → 徐州东，高铁约 2–3 小时；周日建议 <strong>12:40–15:40</strong> 窗口返津，以 <a href="https://kyfw.12306.cn/otn/leftTicket/init" target="_blank" rel="noopener">12306</a> 为准</li>
+                <li><strong>到老城</strong>：徐州东 → 户部山/回龙窝，地铁 1 号线约 30–40 分钟，或打车约 30–40 分钟</li>
+                <li><strong>怎么选</strong>：行李多/赶饭 → 打车；轻装逛老城 → 地铁</li>
+                <li><strong>周日离站</strong>：约 11:30 动身，留 50–60 分钟缓冲</li>
+              </ul>
+            </div>
+            <div class="ibox logic">
+              <h3>路线逻辑</h3>
+              <ul>
+                <li>D1 抵达 + 老城夜逛</li>
+                <li>D2 雨天室内：汉文化 → 博物馆</li>
+                <li>D3 上午云龙湖 → 返程</li>
+                <li><strong>汉文化与龟山二选一</strong></li>
+              </ul>
+            </div>
+            <div class="ibox foodbox">
+              <h3><span class="badge food">必吃</span> 徐州味道</h3>
+              <div class="food-grid">
+                <div class="food-item"><b>饣它汤/辣汤 + 煎包</b> — 早饭标配；推荐<strong>两来风</strong>（老城多店）</div>
+                <div class="food-item"><b>把子肉</b> — 酱香软烂配米饭；推荐<strong>三和兴把子肉</strong></div>
+                <div class="food-item"><b>地锅鸡</b> — 铁锅炖鸡+烙馍；晚饭一锅够</div>
+                <div class="food-item"><b>辣炒羊腰 / 羊肉汤</b> — 夜宵或午饭；夜市更方便</div>
+                <div class="food-item"><b>烙馍、烧烤</b> — <strong>富国街</strong>夜市一次扫街</div>
+              </div>
+              <p style="margin-top:.4rem;opacity:.85">地图上粉色 🍜 为美食点（位置参考，以高德实时为准）</p>
+            </div>
+            <div class="ibox nearby">
+              <h3><span class="badge opt">可选</span> 周边景点（非主线）</h3>
+              <ul>
+                <li><strong>淮海战役纪念馆</strong> — 红旅室内，免费</li>
+                <li><strong>潘安湖</strong> — 湿地公园，近高铁站方向</li>
+                <li><strong>快哉亭公园 / 苏公塔</strong> — 老城/云龙湖边顺路</li>
+                <li><strong>戏马台、云龙山、龟山汉墓</strong> — 见各日备选</li>
+              </ul>
+            </div>
+          </div>
+          <ul class="steps">
+            <li class="d1"><div class="name">周五 · 抵达老城夜逛</div><div class="feat">特色：古城夜景 + 美食开胃</div><div class="tip">徐州东 → 入住户部山 → 两来风/富国街 → 回龙窝·户部山</div></li>
+            <li class="d2"><div class="name">周六 · 雨天偏室内</div><div class="feat">特色：两汉文物深度日</div><div class="tip">汉文化景区 → 徐州博物馆（预约）→ 雨小可短逛云龙湖</div></li>
+            <li class="d3"><div class="name">周日 · 湖景后返程</div><div class="feat">特色：城景名片收尾</div><div class="tip">云龙湖（或改龟山）→ 11:30 前赴徐州东 → 高铁回天津</div></li>
+          </ul>
+          <div class="tips-box">
+            <strong>住：</strong>户部山 / 回龙窝 / 彭城广场一带<br/>
+            <strong>注意：</strong>周六中雨，博物馆周一闭馆；汉文化与龟山二选一
+          </div>
+        </section>
+
+        <section class="day-block" data-panel="1">
+          <h2><span class="badge d1">Day1</span> 周五 10/16 · 抵达夜逛</h2>
+          <div class="info-grid">
+            <div class="ibox weather">
+              <h3><span class="badge wx">天气</span></h3>
+              小雨，18–27℃。带伞；夜逛路面可能湿滑。
+            </div>
+            <div class="ibox transit">
+              <h3><span class="badge tx">交通</span></h3>
+              <ul>
+                <li>高铁：天津南/西 → 徐州东，约 2–3 小时</li>
+                <li>徐州东 → 老城：地铁 1 号线约 30–40 分钟，或打车约 30–40 分钟</li>
+                <li><strong>推荐</strong>：有大件行李打车直达酒店；轻装可坐地铁</li>
+                <li>老城内（回龙窝–户部山–戏马台）步行即可</li>
+              </ul>
+            </div>
+            <div class="ibox foodbox">
+              <h3><span class="badge food">今晚必吃</span></h3>
+              两来风（饣它汤/辣汤煎包）或富国街扫街；把子肉可点三和兴。
+            </div>
+          </div>
+          <ul class="steps">
+            <li class="d1"><div class="name">徐州东站</div><div class="feat">特色：高铁枢纽，进城第一站</div><div class="tip">地铁/打车约半小时到老城</div></li>
+            <li class="d1"><div class="name">入住 · 户部山 / 回龙窝 / 彭城广场</div><div class="feat">特色：住在景点里，夜逛零通勤</div><div class="tip">勿住高铁站当游玩基地</div></li>
+            <li class="food"><div class="name">🍜 晚饭 · 两来风 / 富国街 / 三和兴</div><div class="feat">特色：辣汤煎包、把子肉、夜市烧烤</div><div class="tip">偏油偏辣，雨天室内馆优先</div></li>
+            <li class="d1"><div class="name">夜逛 · 回龙窝 → 户部山</div><div class="feat">特色：明清街巷夜景 + 小吃</div><div class="tip">可选顺路戏马台、快哉亭</div></li>
+          </ul>
+        </section>
+
+        <section class="day-block" data-panel="2">
+          <h2><span class="badge d2">Day2</span> 周六 10/17 · 雨天优化</h2>
+          <div class="info-grid">
+            <div class="ibox weather">
+              <h3><span class="badge wx">天气</span></h3>
+              中雨转小雨，18–24℃。<strong>全天偏室内</strong>；雨具必备。
+            </div>
+            <div class="ibox transit">
+              <h3><span class="badge tx">交通</span></h3>
+              <ul>
+                <li>汉文化偏城东，老城出发<strong>打车约 25–35 分钟</strong></li>
+                <li>汉文化 → 博物馆：打车约 20–30 分钟；雨天优先打车</li>
+                <li>博物馆近户部山，结束后可步行回住地</li>
+              </ul>
+            </div>
+          </div>
+          <ul class="steps">
+            <li class="d2"><div class="name">上午 · 汉文化景区</div><div class="feat">特色：狮子山楚王陵 + 汉兵马俑，西汉诸侯王陵规模全国罕见</div><div class="tip">票约 90，墓室可躲雨 · 约 3 小时</div></li>
+            <li class="d2"><div class="name">下午 · 徐州博物馆</div><div class="feat">特色：金缕玉衣、汉代文物硬核馆藏</div><div class="tip">免费须预约；约 2–3 小时；周一常闭</div></li>
+            <li class="opt"><div class="name">可选 · 云龙湖短逛</div><div class="feat">特色：城中大湖天际线</div><div class="tip">仅雨小时；雨大回老城歇脚</div></li>
+            <li class="opt"><div class="name">可选 · 淮海战役纪念馆</div><div class="feat">特色：大型红色主题室内展馆</div><div class="tip">不爱红旅可砍；地铁方便</div></li>
+          </ul>
+        </section>
+
+        <section class="day-block" data-panel="3">
+          <h2><span class="badge d3">Day3</span> 周日 10/18 · 返程</h2>
+          <div class="info-grid">
+            <div class="ibox weather">
+              <h3><span class="badge wx">天气</span></h3>
+              多云转阴，12–24℃；傍晚约 12℃，湖边加薄外套。
+            </div>
+            <div class="ibox transit">
+              <h3><span class="badge tx">交通</span></h3>
+              <ul>
+                <li>云龙湖：户部山可步行/短途打车</li>
+                <li>改龟山则打车更省事（与汉文化二选一）</li>
+                <li><strong>约 11:30 动身</strong>赴徐州东，留 50–60 分钟缓冲</li>
+                <li>返程建议 <strong>12:40–15:40</strong>，查 <a href="https://kyfw.12306.cn/otn/leftTicket/init" target="_blank" rel="noopener">12306</a></li>
+              </ul>
+            </div>
+          </div>
+          <ul class="steps">
+            <li class="d3"><div class="name">上午 · 云龙湖（+可选云龙山）</div><div class="feat">特色：徐州城景名片，环湖免费散步</div><div class="tip">约 1.5–3 小时；时间紧别爬山</div></li>
+            <li class="opt"><div class="name">备选 · 龟山汉墓</div><div class="feat">特色：南北甬道一线贯通，声学回音奇特</div><div class="tip">与汉文化二选一 · 票约 80</div></li>
+            <li class="opt"><div class="name">顺路可选 · 苏公塔 / 潘安湖</div><div class="feat">特色：古塔湖景 / 高铁站旁湿地</div><div class="tip">时间紧直接去东站</div></li>
+            <li class="d3"><div class="name">11:30 前动身 → 徐州东站</div><div class="feat">特色：留足缓冲，安心上车</div><div class="tip">地铁约 30–40 分或打车</div></li>
+          </ul>
+        </section>
+
+        <footer class="note">
+          住老城户部山一带；周六雨天偏室内；汉文化与龟山二选一。坐标为近似 GCJ-02；美食店址以高德实时为准。高德瓦片仅作个人出行示意。
+        </footer>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  const places = {
+    station: {
+      id: "station", name: "徐州东站", lat: 34.2670, lng: 117.3020, kind: "main",
+      tip: "高铁进出站枢纽；地铁1号线或打车约30–40分钟到老城",
+      feature: "徐州东门户，进城与返程必经",
+      duration: "过站", indoor: true, ticket: "凭票进站",
+      pros: "班次多、接驳方便", cons: "周边餐饮一般，别当住宿基地", days: [1, 3]
+    },
+    huilong: {
+      id: "huilong", name: "回龙窝", lat: 34.2625, lng: 117.1855, kind: "main",
+      tip: "老城夜逛起点，小吃与夜景集中",
+      feature: "老徐州街巷夜市氛围，小吃密度高",
+      duration: "约 1 小时", indoor: false, ticket: "免费",
+      pros: "氛围好、挨夜市", cons: "白天单独不值专程", days: [1]
+    },
+    hubushan: {
+      id: "hubushan", name: "户部山古民居", lat: 34.2610, lng: 117.1875, kind: "main",
+      tip: "夜逛主阵地，住宿也建议落在这带",
+      feature: "明清民居聚落，吃住逛一体的古城核心",
+      duration: "约 1 小时", indoor: false, ticket: "街区免费；部分院落收费",
+      pros: "吃住逛一体", cons: "节假日人多", days: [1]
+    },
+    ximatai: {
+      id: "ximatai", name: "戏马台", lat: 34.2595, lng: 117.1900, kind: "optional",
+      tip: "户部山顺路可选，项羽点将传说地",
+      feature: "项羽戏马点将传说地，古城制高点之一",
+      duration: "30–40 分钟", indoor: false, ticket: "低价或免费（以现场为准）",
+      pros: "顺路、有故事", cons: "体量小，非必去", days: [1], optional: true
+    },
+    hanwenhua: {
+      id: "hanwenhua", name: "汉文化景区", lat: 34.2340, lng: 117.2890, kind: "main",
+      tip: "城东；老城出发打车约25–35分钟，雨天优先打车",
+      feature: "狮子山楚王陵 + 汉兵马俑，西汉诸侯王陵规模罕见",
+      duration: "约 3 小时", indoor: "mixed", ticket: "约 90 元",
+      pros: "体系完整，墓室可躲雨", cons: "走路多、与龟山题材重叠", days: [2]
+    },
+    museum: {
+      id: "museum", name: "徐州博物馆", lat: 34.2490, lng: 117.1850, kind: "main",
+      tip: "两汉文物硬核，雨天首选；须提前预约",
+      feature: "金缕玉衣等镇馆之宝，两汉文物硬核",
+      duration: "2–3 小时", indoor: true, ticket: "免费（预约）",
+      pros: "展陈扎实、室内", cons: "周一常闭馆；黄牛票勿信", days: [2]
+    },
+    yunlonghu: {
+      id: "yunlonghu", name: "云龙湖", lat: 34.2480, lng: 117.1860, kind: "main",
+      tip: "城景名片；周六雨小可短逛，周日上午主场",
+      feature: "城中大湖天际线，徐州最出片免费名片",
+      duration: "1.5–3 小时", indoor: false, ticket: "环湖免费",
+      pros: "开阔好看、免费", cons: "雨天体验差", days: [2, 3]
+    },
+    yunlongshan: {
+      id: "yunlongshan", name: "云龙山", lat: 34.2455, lng: 117.1835, kind: "optional",
+      tip: "湖边顺路爬山，周日时间紧可砍",
+      feature: "湖边山脊，登高俯瞰云龙湖全景",
+      duration: "1–1.5 小时", indoor: false, ticket: "低价或免费（以现场为准）",
+      pros: "俯瞰湖景", cons: "周日上午时间紧", days: [3], optional: true
+    },
+    guishan: {
+      id: "guishan", name: "龟山汉墓", lat: 34.2780, lng: 117.1750, kind: "optional",
+      tip: "偏西北；与汉文化二选一，打车更省事",
+      feature: "南北甬道一线贯通，回音与精密开凿著称",
+      duration: "约 1.5 小时", indoor: "mixed", ticket: "约 80 元",
+      pros: "甬道体验独特", cons: "位置偏、题材重复", days: [3], optional: true
+    },
+    huaihai: {
+      id: "huaihai", name: "淮海战役纪念馆", lat: 34.2390, lng: 117.1550, kind: "optional",
+      tip: "红旅可选，地铁方便；不爱可砍",
+      feature: "大型红色主题展馆，室内适合雨天",
+      duration: "1.5–2 小时", indoor: true, ticket: "免费",
+      pros: "室内、免费", cons: "不在主线；周一常闭", days: [], optional: true
+    },
+    pananhu: {
+      id: "pananhu", name: "潘安湖", lat: 34.2855, lng: 117.3520, kind: "optional",
+      tip: "近高铁站方向的湿地公园，短周末性价比一般",
+      feature: "采煤塌陷地改造的城市湿地，候鸟与环湖步道",
+      duration: "2–3 小时", indoor: false, ticket: "园区多免费/低价（以现场为准）",
+      pros: "离东站近、生态开阔", cons: "挤进三日主线性价比一般", days: [], optional: true
+    },
+    kuaizai: {
+      id: "kuaizai", name: "快哉亭公园", lat: 34.2618, lng: 117.1805, kind: "optional",
+      tip: "老城口袋公园，户部山/彭城广场顺路",
+      feature: "苏轼「快哉」典故，老城小憩绿地",
+      duration: "20–40 分钟", indoor: false, ticket: "免费",
+      pros: "顺路、安静", cons: "体量小", days: [1], optional: true
+    },
+    sugongta: {
+      id: "sugongta", name: "苏公塔", lat: 34.2468, lng: 117.1768, kind: "optional",
+      tip: "云龙湖/兴化寺一带，湖景顺路",
+      feature: "古塔与湖山同框，云龙景区经典一景",
+      duration: "30–45 分钟", indoor: false, ticket: "随景区（以现场为准）",
+      pros: "出片、顺路", cons: "时间紧可砍", days: [3], optional: true
+    },
+    lianglaifeng: {
+      id: "lianglaifeng", name: "两来风", lat: 34.2640, lng: 117.1865, kind: "food",
+      tip: "本地连锁，老城多店；以高德实时门店为准",
+      feature: "饣它汤/辣汤 + 煎包，徐州早饭灵魂组合",
+      duration: "30–60 分钟", indoor: true, ticket: "人均自理",
+      pros: "本地人气、出餐快", cons: "高峰排队", days: [1]
+    },
+    sanhexing: {
+      id: "sanhexing", name: "三和兴把子肉", lat: 34.2638, lng: 117.1885, kind: "food",
+      tip: "把子肉老字号参考点，具体门店以高德为准",
+      feature: "酱香把子肉配米饭，徐州家常硬菜",
+      duration: "40–70 分钟", indoor: true, ticket: "人均自理",
+      pros: "酱香软烂、代表性强", cons: "偏油腻，注意排队", days: [1]
+    },
+    fuguo: {
+      id: "fuguo", name: "富国街夜市", lat: 34.2635, lng: 117.1840, kind: "food",
+      tip: "夜市小吃一条街：烧烤、羊腰、烙馍",
+      feature: "夜市扫街：辣炒羊腰、烧烤、烙馍一站式",
+      duration: "1 小时", indoor: false, ticket: "免费逛",
+      pros: "选择多、接地气", cons: "偏油偏吵，雨天体验一般", days: [1]
+    }
+  };
+
+  const routes = {
+    1: { color: "#2563eb", order: ["station", "huilong", "lianglaifeng", "hubushan", "ximatai"], dash: false },
+    2: { color: "#c2410c", order: ["hanwenhua", "museum", "yunlonghu"], dash: false },
+    3: { color: "#7c3aed", order: ["yunlonghu", "station"], dash: false },
+    alt3: { color: "#64748b", order: ["guishan", "station"], dash: true }
+  };
+
+  const map = L.map("map", { zoomControl: true, attributionControl: true }).setView([34.255, 117.20], 12);
+
+  L.tileLayer("https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}", {
+    subdomains: ["1", "2", "3", "4"], maxZoom: 18,
+    attribution: '&copy; <a href="https://www.amap.com/">高德地图</a>'
+  }).addTo(map);
+
+  function pinClass(p) {
+    if (p.kind === "food") return "food";
+    if (p.kind === "optional" || p.optional) return "opt";
+    if (p.days && p.days.length === 1) return "d" + p.days[0];
+    if (p.id === "station") return "d1";
+    if (p.id === "yunlonghu") return "d3";
+    if (p.days && p.days[0]) return "d" + p.days[0];
+    return "opt";
+  }
+
+  function pinIcon(p) {
+    const cls = pinClass(p);
+    const inner = cls === "food" ? "🍜" : (cls === "opt" ? "可" : "");
+    return L.divIcon({
+      className: "marker-label",
+      html: '<div class="num-pin ' + cls + '"><span>' + inner + '</span></div>',
+      iconSize: cls === "food" ? [30, 30] : [28, 28],
+      iconAnchor: cls === "food" ? [15, 15] : [14, 28],
+      popupAnchor: cls === "food" ? [0, -12] : [0, -24]
+    });
+  }
+
+  function indoorLabel(v) {
+    if (v === true) return '<span class="tag in">室内</span>';
+    if (v === false) return '<span class="tag out">室外</span>';
+    return '<span class="tag">室内外</span>';
+  }
+
+  function kindLabel(p) {
+    if (p.kind === "food") return '<span class="tag food">美食</span>';
+    if (p.kind === "optional" || p.optional) return '<span class="tag opt">可选</span>';
+    return "";
+  }
+
+  function popupHtml(p) {
+    return '<div class="popup"><h3>' + p.name + '</h3>' +
+      '<div>' + indoorLabel(p.indoor) + kindLabel(p) + '</div>' +
+      '<div class="feat">特色：' + p.feature + '</div>' +
+      '<div class="meta">' + p.tip + '</div>' +
+      '<div class="meta">建议时长：' + p.duration + '</div>' +
+      '<div class="meta">门票：' + p.ticket + '</div>' +
+      '<div class="pc"><b>优</b> ' + p.pros + '<br/><b>缺</b> ' + p.cons + '</div></div>';
+  }
+
+  const markers = {};
+  Object.keys(places).forEach(function (key) {
+    const p = places[key];
+    const m = L.marker([p.lat, p.lng], { icon: pinIcon(p) });
+    m.bindPopup(popupHtml(p));
+    markers[key] = m;
+  });
+
+  const polylines = [];
+  const chips = {
+    all: ["🌧 周五小雨 18–27℃", "🌂 周六中雨偏室内", "🍜 粉色为美食点"],
+    "1": ["🌧 周五小雨 18–27℃", "🍜 今晚：两来风/富国街/三和兴"],
+    "2": ["🌂 中雨转小雨 · 偏室内", "🚕 汉文化偏东 · 雨天优先打车"],
+    "3": ["☁ 12–24℃ · 傍晚约12℃", "⏰ 11:30动身 · 留50–60分缓冲"]
+  };
+
+  function updateChips(day) {
+    const el = document.getElementById("mapChips");
+    const list = chips[day] || chips.all;
+    el.innerHTML = list.map(function (t) { return "<span>" + t + "</span>"; }).join("");
+  }
+
+  function clearLayers() {
+    Object.keys(markers).forEach(function (k) {
+      if (map.hasLayer(markers[k])) map.removeLayer(markers[k]);
+    });
+    polylines.forEach(function (pl) { map.removeLayer(pl); });
+    polylines.length = 0;
+  }
+
+  function addRoute(routeKey) {
+    const r = routes[routeKey];
+    if (!r) return;
+    const latlngs = r.order.map(function (id) {
+      const p = places[id];
+      return [p.lat, p.lng];
+    });
+    const pl = L.polyline(latlngs, {
+      color: r.color, weight: r.dash ? 3 : 4, opacity: r.dash ? 0.55 : 0.85,
+      dashArray: r.dash ? "8 8" : null, lineJoin: "round"
+    }).addTo(map);
+    polylines.push(pl);
+  }
+
+  function showMarkersForDay(day) {
+    Object.keys(places).forEach(function (key) {
+      const p = places[key];
+      let show = false;
+      if (day === "all") {
+        show = true;
+      } else {
+        const d = Number(day);
+        if (p.days && p.days.indexOf(d) !== -1) show = true;
+        if (p.kind === "food" && d === 1) show = true;
+        if (d === 1 && (p.id === "ximatai" || p.id === "kuaizai")) show = true;
+        if (d === 2 && (p.id === "huaihai" || p.id === "yunlonghu")) show = true;
+        if (d === 3 && (p.id === "guishan" || p.id === "yunlongshan" || p.id === "sugongta" || p.id === "pananhu")) show = true;
+        if (day === "all") show = true;
+      }
+      if (show) markers[key].addTo(map);
+    });
+  }
+
+  function fitToVisible() {
+    const layers = [];
+    Object.keys(markers).forEach(function (k) {
+      if (map.hasLayer(markers[k])) layers.push(markers[k]);
+    });
+    polylines.forEach(function (pl) { layers.push(pl); });
+    if (!layers.length) return;
+    map.fitBounds(L.featureGroup(layers).getBounds().pad(0.18));
+  }
+
+  function setDay(day) {
+    clearLayers();
+    showMarkersForDay(day);
+    if (day === "all") { addRoute(1); addRoute(2); addRoute(3); addRoute("alt3"); }
+    else if (day === "1") addRoute(1);
+    else if (day === "2") addRoute(2);
+    else if (day === "3") { addRoute(3); addRoute("alt3"); }
+    document.querySelectorAll(".day-block").forEach(function (el) {
+      el.classList.toggle("show", el.getAttribute("data-panel") === day);
+    });
+    document.querySelectorAll(".tab").forEach(function (btn) {
+      btn.classList.toggle("active", btn.getAttribute("data-day") === day);
+    });
+    updateChips(day);
+    setTimeout(function () { map.invalidateSize(); fitToVisible(); }, 50);
+  }
+
+  document.querySelectorAll(".tab").forEach(function (btn) {
+    btn.addEventListener("click", function () { setDay(btn.getAttribute("data-day")); });
+  });
+
+  setDay("all");
+  window.addEventListener("resize", function () { map.invalidateSize(); });
+})();
+</script>
+</body>
+</html>
